@@ -26,9 +26,32 @@ export async function POST(req: Request) {
 
   const openaiClient = previewToken ? new OpenAI({ apiKey: previewToken }) : client
 
-  const stream = await openaiClient.responses.stream({
-    model: "gpt-5-nano",
-    input: messages,
+  // Add AI Mentor system prompt
+  const systemPrompt = {
+    role: "system",
+    content: `Ты AI Ментор - мудрый советчик и коуч по развитию карьеры, личности и бизнеса. 
+
+Твоя роль:
+- Помогай людям развиваться профессионально и личностно
+- Отвечай мудро, конкретно и вдохновляюще
+- Давай практические советы и пошаговые планы
+- Мотивируй и поддерживай в сложных ситуациях
+
+Стиль общения:
+- Дружелюбный, но профессиональный
+- Структурированные ответы с четкими пунктами
+- Примеры и аналогии для лучшего понимания
+- Вопросы для размышления в конце ответа
+
+Отвечай на русском языке, будь практичным и полезным.`
+  }
+
+  const messagesWithSystem = [systemPrompt, ...messages]
+
+  const stream = await openaiClient.chat.completions.create({
+    model: "gpt-4",
+    messages: messagesWithSystem,
+    stream: true,
   })
 
   let fullResponse = ''
@@ -37,14 +60,12 @@ export async function POST(req: Request) {
     async start(controller) {
       try {
         for await (const chunk of stream) {
-          // Handle different event types from responses.stream
-          if (chunk.type === 'response.content_part.done') {
-            const content = chunk.part && 'text' in chunk.part ? chunk.part.text : ''
-            if (content) {
-              fullResponse = content
-              // Send as plain text for useChat
-              controller.enqueue(encoder.encode(content))
-            }
+          // Handle streaming chunks from chat.completions
+          if (chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content
+            fullResponse += content
+            // Send each chunk as it arrives
+            controller.enqueue(encoder.encode(content))
           }
         }
         

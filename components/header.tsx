@@ -42,14 +42,17 @@ export async function Header() {
         )}
         <div className="flex items-center">
           <IconSeparator className="h-6 w-6 text-muted-foreground/50" />
-          {session?.user ? (
-            <UserMenu user={session.user} />
-          ) : (
-            <Button variant="link" asChild className="-ml-2">
-              <Link href="/sign-in">Login</Link>
-            </Button>
-          )}
+          <h1 className="ml-2 text-lg font-semibold text-foreground">AI Ментор</h1>
         </div>
+      </div>
+      <div className="flex items-center">
+        {session?.user ? (
+          <UserMenu user={session.user} />
+        ) : (
+          <Button variant="link" asChild className="-ml-2">
+            <Link href="/sign-in">Войти</Link>
+          </Button>
+        )}
       </div>
     </header>
   )

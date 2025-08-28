@@ -1,52 +1,45 @@
 import { UseChatHelpers } from 'ai/react'
-
+import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ExternalLink } from '@/components/external-link'
-import { IconArrowRight } from '@/components/ui/icons'
 
-const exampleMessages = [
-  {
-    heading: 'Explain technical concepts',
-    message: `What is a "serverless function"?`
-  },
-  {
-    heading: 'Summarize an article',
-    message: 'Summarize the following article for a 2nd grader: \n'
-  },
-  {
-    heading: 'Draft an email',
-    message: `Draft an email to my boss about the following: \n`
-  }
+const PRESET_QUESTIONS = [
+  'Чему учиться в эпоху ИИ?',
+  'Чему учить детей?',
+  'Какие профессии выживут?',
+  'Мне больше 50, что мне делать?',
+  'Как создать пассивный доход?',
+  'Секреты продуктивности?',
+  'Как побороть прокрастинацию?',
+  'Инвестиции для новичков?'
 ]
 
 export function EmptyScreen({ setInput }: Pick<UseChatHelpers, 'setInput'>) {
+  const handlePresetQuestion = (question: string) => {
+    setInput(question)
+  }
+
   return (
-    <div className="mx-auto max-w-2xl px-4">
-      <div className="rounded-lg border bg-background p-8">
-        <h1 className="mb-2 text-lg font-semibold">
-          Welcome to the Supabaseified Next.js AI Chatbot!
-        </h1>
-        <p className="mb-2 leading-normal text-muted-foreground">
-          This is an open source AI chatbot app template built with{' '}
-          <ExternalLink href="https://nextjs.org">Next.js</ExternalLink> and{' '}
-          <ExternalLink href="https://supabase.com">Supabase</ExternalLink>.
+    <div className="flex flex-col items-center justify-center h-full text-center py-4 sm:py-8 px-2">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">AI Ментор</h1>
+        <p className="text-gray-600 text-sm max-w-md">
+          Задайте вопрос или выберите один из популярных вопросов ниже
         </p>
-        <p className="leading-normal text-muted-foreground">
-          You can start a conversation here or try the following examples:
-        </p>
-        <div className="mt-4 flex flex-col items-start space-y-2">
-          {exampleMessages.map((message, index) => (
-            <Button
-              key={index}
-              variant="link"
-              className="h-auto p-0 text-base"
-              onClick={() => setInput(message.message)}
-            >
-              <IconArrowRight className="mr-2 text-muted-foreground" />
-              {message.heading}
-            </Button>
-          ))}
-        </div>
+      </div>
+
+      {/* Preset Question Buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-4xl w-full">
+        {PRESET_QUESTIONS.map((question, index) => (
+          <Button
+            key={index}
+            variant="outline"
+            onClick={() => handlePresetQuestion(question)}
+            className="flex items-center justify-center p-2 sm:p-3 lg:p-4 h-auto min-h-[50px] sm:min-h-[60px] text-xs sm:text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+          >
+            <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+            <span className="text-center leading-tight">{question}</span>
+          </Button>
+        ))}
       </div>
     </div>
   )
