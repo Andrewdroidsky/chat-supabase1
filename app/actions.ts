@@ -9,7 +9,9 @@ import { redirect } from 'next/navigation'
 import { type Chat } from '@/lib/types'
 
 export async function getChats(userId?: string | null) {
+  console.log('getChats called with userId:', userId)
   if (!userId) {
+    console.log('No userId, returning empty array')
     return []
   }
   try {
@@ -17,15 +19,24 @@ export async function getChats(userId?: string | null) {
     const supabase = createServerActionClient<Database>({
       cookies: () => cookieStore
     })
-    const { data } = await supabase
+    const result = await supabase
       .from('chats')
       .select('payload')
       .order('payload->createdAt', { ascending: false })
       .eq('user_id', userId)
-      .throwOnError()
+    
+    console.log('Supabase query result:', result)
+    
+    if (result.error) {
+      console.error('Supabase error:', result.error)
+      return []
+    }
 
-    return (data?.map(entry => entry.payload) as Chat[]) ?? []
+    const chats = (result.data?.map(entry => entry.payload) as Chat[]) ?? []
+    console.log('Returning chats:', chats.length)
+    return chats
   } catch (error) {
+    console.error('getChats error:', error)
     return []
   }
 }

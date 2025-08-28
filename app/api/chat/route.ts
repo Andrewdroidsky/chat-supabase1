@@ -1,71 +1,96 @@
-import 'server-only'
-import { OpenAIStream, StreamingTextResponse } from 'ai'
-import { Configuration, OpenAIApi } from 'openai-edge'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { Database } from '@/lib/db_types'
+import "server-only"
+import { StreamingTextResponse } from "ai"
+import OpenAI from "openai"
+import { cookies } from "next/headers"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { Database } from "@/lib/db_types"
+import { auth } from "@/auth"
+import { nanoid } from "@/lib/utils"
+import { revalidatePath } from "next/cache"
 
-import { auth } from '@/auth'
-import { nanoid } from '@/lib/utils'
+export const runtime = "edge"
 
-export const runtime = 'edge'
-
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY
-})
-
-const openai = new OpenAIApi(configuration)
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(req: Request) {
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient<Database>({
-    cookies: () => cookieStore
+    cookies: () => cookieStore,
   })
-  const json = await req.json()
-  const { messages, previewToken } = json
+  const { messages, previewToken, id } = await req.json()
   const userId = (await auth({ cookieStore }))?.user.id
 
   if (!userId) {
-    return new Response('Unauthorized', {
-      status: 401
-    })
+    return new Response("Unauthorized", { status: 401 })
   }
 
-  if (previewToken) {
-    configuration.apiKey = previewToken
-  }
+  const openaiClient = previewToken ? new OpenAI({ apiKey: previewToken }) : client
 
-  const res = await openai.createChatCompletion({
-    model: 'gpt-3.5-turbo',
-    messages,
-    temperature: 0.7,
-    stream: true
+  const stream = await openaiClient.responses.stream({
+    model: "gpt-5-nano",
+    input: messages,
   })
 
-  const stream = OpenAIStream(res, {
-    async onCompletion(completion) {
-      const title = json.messages[0].content.substring(0, 100)
-      const id = json.id ?? nanoid()
-      const createdAt = Date.now()
-      const path = `/chat/${id}`
-      const payload = {
-        id,
-        title,
-        userId,
-        createdAt,
-        path,
-        messages: [
-          ...messages,
-          {
-            content: completion,
-            role: 'assistant'
+  let fullResponse = ''
+  const encoder = new TextEncoder()
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          // Handle different event types from responses.stream
+          if (chunk.type === 'response.content_part.done') {
+            const content = chunk.part && 'text' in chunk.part ? chunk.part.text : ''
+            if (content) {
+              fullResponse = content
+              // Send as plain text for useChat
+              controller.enqueue(encoder.encode(content))
+            }
           }
-        ]
+        }
+        
+        // Save to database when streaming is complete
+        console.log('Saving to database...')
+        console.log('userId:', userId)
+        console.log('fullResponse:', fullResponse.substring(0, 100))
+        
+        const title = messages[0].content.substring(0, 100)
+        const chatId = id ?? nanoid()
+        const createdAt = Date.now()
+        const path = `/chat/${chatId}`
+        const payload = {
+          id: chatId,
+          title,
+          userId,
+          createdAt,
+          path,
+          messages: [...messages, { role: "assistant", content: fullResponse }],
+        }
+        
+        console.log('Payload:', JSON.stringify(payload, null, 2))
+        
+        try {
+          const result = await supabase.from("chats").upsert({ 
+            id: chatId, 
+            user_id: userId, 
+            payload 
+          })
+          console.log('Database result:', result)
+          if (result.error) {
+            console.error('Database error:', result.error)
+          } else {
+            // Revalidate the homepage to update sidebar
+            revalidatePath('/')
+          }
+        } catch (error) {
+          console.error('Save error:', error)
+        }
+        
+        controller.close()
+      } catch (error) {
+        controller.error(error)
       }
-      // Insert chat into database.
-      await supabase.from('chats').upsert({ id, payload }).throwOnError()
     }
   })
 
-  return new StreamingTextResponse(stream)
+  return new StreamingTextResponse(readableStream)
 }
