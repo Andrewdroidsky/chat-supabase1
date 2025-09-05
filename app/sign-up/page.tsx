@@ -1,26 +1,44 @@
-import { auth } from '@/auth'
-import { LoginButton } from '@/components/login-button'
-import { LoginForm } from '@/components/login-form'
-import { Separator } from '@/components/ui/separator'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+'use client'
+import { useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-export default async function SignInPage() {
-  const cookieStore = cookies()
-  const session = await auth({ cookieStore })
-  // redirect to home if user is already logged in
-  if (session?.user) {
-    redirect('/')
+export default function SignUpPage() {
+  const supabase = createClientComponentClient()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) alert(error.message)
+    else window.location.href = '/sign-in'
   }
+
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col items-center justify-center py-10">
-      <div className="w-full max-w-sm">
-        <LoginForm action="sign-up" />
-        <Separator className="my-4" />
-        <div className="flex justify-center">
-          <LoginButton />
-        </div>
+    <form onSubmit={onSubmit} className="max-w-lg mx-auto p-4">
+      <h1 className="text-xl mb-4">Sign Up</h1>
+
+      <input
+        className="border p-2 w-full mb-3"
+        placeholder="Email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+      />
+      <input
+        className="border p-2 w-full mb-3"
+        placeholder="Password"
+        type="password"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+      />
+
+      <button className="border px-4 py-2 rounded w-full">Create account</button>
+
+      <div className="mt-4">
+        <a href="/sign-in" className="text-blue-600 underline">
+          Уже есть аккаунт? Sign In
+        </a>
       </div>
-    </div>
+    </form>
   )
 }
